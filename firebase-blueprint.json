@@ -1,0 +1,98 @@
+{
+  "entities": {
+    "Wallpaper": {
+      "title": "Wallpaper",
+      "description": "Un fondo de pantalla subido por un usuario o administrador",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Título del fondo de pantalla" },
+        "url": { "type": "string", "description": "URL de la imagen del fondo" },
+        "orientation": { "type": "string", "enum": ["vertical", "horizontal"], "description": "Orientación del fondo de pantalla" },
+        "uploadedBy": { "type": "string", "description": "ID del usuario que subió la imagen" },
+        "uploadedAt": { "type": "string", "format": "date-time", "description": "Fecha y hora de subida" },
+        "approved": { "type": "boolean", "description": "Indica si fue aprobado por los moderadores" },
+        "moderationPassed": { "type": "boolean", "description": "Indica si pasó la moderación por IA" },
+        "qualityScore": { "type": "number", "description": "Puntuación de calidad de 1 a 10" },
+        "aesthetic": { "type": "string", "description": "Categoría estética determinada por la IA" },
+        "feedback": { "type": "string", "description": "Retroalimentación de la IA o moderadores" },
+        "downloadsCount": { "type": "number", "description": "Cantidad de descargas realizadas" },
+        "likesCount": { "type": "number", "description": "Cantidad de me gusta acumulados" }
+      },
+      "required": ["title", "url", "orientation", "uploadedBy", "approved"]
+    },
+    "Favorite": {
+      "title": "Favorite",
+      "description": "Asociación de favorito entre un usuario y un fondo de pantalla",
+      "type": "object",
+      "properties": {
+        "wallpaperId": { "type": "string", "description": "ID del wallpaper marcado como favorito" },
+        "favoritedAt": { "type": "string", "format": "date-time", "description": "Fecha y hora de marcación" }
+      },
+      "required": ["wallpaperId"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Perfil del usuario registrado",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "ID del usuario" },
+        "displayName": { "type": "string", "description": "Nombre para mostrar" },
+        "email": { "type": "string", "description": "Correo electrónico del usuario" },
+        "photoURL": { "type": "string", "description": "URL del avatar del usuario" },
+        "lastLogin": { "type": "string", "format": "date-time", "description": "Fecha de última conexión" }
+      },
+      "required": ["uid", "displayName", "email", "lastLogin"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "Notificación persistente para un usuario",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID de la notificación" },
+        "title": { "type": "string", "description": "Título de la notificación" },
+        "message": { "type": "string", "description": "Detalle o mensaje" },
+        "type": { "type": "string", "enum": ["success", "info", "warning"], "description": "Categoría visual" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Fecha de la notificación" },
+        "seen": { "type": "boolean", "description": "Indica si fue leída" }
+      },
+      "required": ["id", "title", "message", "type", "timestamp", "seen"]
+    },
+    "DownloadLog": {
+      "title": "DownloadLog",
+      "description": "Auditoría de descarga de un fondo de pantalla",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID del registro" },
+        "wallpaperId": { "type": "string", "description": "ID del fondo de pantalla" },
+        "wallpaperTitle": { "type": "string", "description": "Título del fondo de pantalla" },
+        "requestedBy": { "type": "string", "description": "ID del usuario solicitante" },
+        "requestedByEmail": { "type": "string", "description": "Email del usuario solicitante" },
+        "requestedByName": { "type": "string", "description": "Nombre del usuario solicitante" },
+        "requestedAt": { "type": "string", "format": "date-time", "description": "Timestamp de la descarga" }
+      },
+      "required": ["id", "wallpaperId", "wallpaperTitle", "requestedBy", "requestedByEmail", "requestedByName", "requestedAt"]
+    }
+  },
+  "firestore": {
+    "/wallpapers/{wallpaperId}": {
+      "schema": "Wallpaper",
+      "description": "Fondo de pantalla público y en proceso de revisión"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Información de perfil del usuario registrado"
+    },
+    "/users/{userId}/favorites/{favoriteId}": {
+      "schema": "Favorite",
+      "description": "Fondos de pantalla seleccionados como favoritos por cada usuario"
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": "AppNotification",
+      "description": "Notificaciones persistentes generadas para el usuario"
+    },
+    "/download_logs/{logId}": {
+      "schema": "DownloadLog",
+      "description": "Registros de descargas de fondos de pantalla con fines de auditoría y estadística"
+    }
+  }
+}

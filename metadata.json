@@ -1,0 +1,8 @@
+{
+  "name": "OnyxWall",
+  "description": "El destino definitivo para fondos de pantalla OLED de súper lujo y arte digital de alta fidelidad certificado por IA",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

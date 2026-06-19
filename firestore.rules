@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.uid == 'mgwZZrieGtOjPf1GwynoT8ujytZ2' ||
+        request.auth.uid == '9yIt0kCQzWS3Odoi1YIHcZrbpJZ2' ||
+        (
+          request.auth.token != null &&
+          'email' in request.auth.token &&
+          request.auth.token.email in [
+            'andressy1126@gmail.com',
+            'andresksa123@gmail.com',
+            'admin@onyxwall.com',
+            'system_admin@onyxwall.com'
+          ]
+        )
+      );
+    }
+
+    // Wallpapers Collection
+    match /wallpapers/{wallpaperId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Users Profile Collection
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // User Favorites Collection (Private PII/Preferences Isolation)
+    match /users/{userId}/favorites/{favoriteId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // User Notifications Collection
+    match /users/{userId}/notifications/{notificationId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // Audits and Download Request Logs
+    match /download_logs/{logId} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin();
+    }
+  }
+}
