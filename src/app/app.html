@@ -393,7 +393,7 @@
 
             <!-- Categories Filter -->
             <div>
-              <label class="text-[10px] font-mono tracking-wider uppercase opacity-50 block mb-2">Estilos Estéticos</label>
+              <label class="text-[10px] font-mono tracking-wider uppercase opacity-50 block mb-2">Estilos Estéticos (Auto-poblados)</label>
               <select 
                 [value]="selectedCategory()" 
                 (change)="selectedCategory.set($any($event.target).value)"
@@ -401,11 +401,9 @@
                 class="w-full text-xs p-2.5 rounded-xl border focus:outline-none focus:ring-1 focus:ring-emerald-400"
               >
                 <option value="all">Todas las Categorías</option>
-                <option value="lines">Líneas / Minimalista</option>
-                <option value="oled">Negro Absoluto / OLED</option>
-                <option value="cósmico">Cósmico / Espacial</option>
-                <option value="arquitectura">Arquitectura Modernista</option>
-                <option value="paisaje">Paisajes Sombríos</option>
+                @for (cat of detectedAestheticCategories(); track cat) {
+                  <option [value]="cat">{{ cat }}</option>
+                }
               </select>
             </div>
 
@@ -620,6 +618,32 @@
 
       <!-- Prime Scroll / Cards Feed area (3 Columns Grid) -->
       <div class="lg:col-span-3 space-y-6">
+        
+        <!-- Interactive Aesthetic Category Pills (Auto-populated) -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-white/10">
+          <button 
+            (click)="selectedCategory.set('all')"
+            [class]="selectedCategory() === 'all' 
+              ? 'bg-gradient-to-r from-emerald-500/20 to-indigo-600/20 text-emerald-400 border-emerald-500/40 font-bold' 
+              : (darkMode() ? 'bg-white/5 border-white/5 text-gray-400 hover:text-white hover:bg-white/10' : 'bg-black/5 border-black/5 text-gray-600 hover:text-black hover:bg-black/10')"
+            class="px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-all flex items-center gap-1.5 border cursor-pointer duration-200"
+          >
+            <mat-icon class="text-xs">apps</mat-icon>
+            <span>Todos los Estilos</span>
+          </button>
+          
+          @for (cat of detectedAestheticCategories(); track cat) {
+            <button 
+              (click)="selectedCategory.set(cat)"
+              [class]="selectedCategory() === cat 
+                ? 'bg-gradient-to-r from-emerald-500/20 to-indigo-600/20 text-emerald-400 border-emerald-500/40 font-bold' 
+                : (darkMode() ? 'bg-white/5 border-white/5 text-gray-400 hover:text-white hover:bg-white/10' : 'bg-black/5 border-black/5 text-gray-600 hover:text-black hover:bg-black/10')"
+              class="px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap transition-all border cursor-pointer duration-200"
+            >
+              {{ cat }}
+            </button>
+          }
+        </div>
         
         <!-- Search, filter stats bar -->
         <div [class]="darkMode() ? 'bg-white/5 border-white/5' : 'bg-black/5 border-black/5'" class="py-3 px-4 rounded-xl flex items-center justify-between text-xs font-mono">
@@ -1044,6 +1068,173 @@
           <!-- AUDITS SIDEBAR: Download Telemetry Logs & Push triggers (Take 1 Column) -->
           <div class="space-y-6">
             
+            <!-- Dynamic 7-Day Download Trend Chart Panel (Recharts Native Engine) -->
+            <div [class]="darkMode() ? 'bg-[#0f0f12] border-white/5 text-white' : 'bg-white border-black/10 text-neutral-800 shadow-sm'" class="p-4 sm:p-5 rounded-2xl border flex flex-col">
+              <!-- Card Header -->
+              <div class="flex items-center justify-between border-b pb-2.5 mb-3.5" [class]="darkMode() ? 'border-white/5' : 'border-black/5'">
+                <div class="flex items-center gap-2">
+                  <div class="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                    <mat-icon class="text-xs antialiased">show_chart</mat-icon>
+                  </div>
+                  <span class="text-xs font-black tracking-wider uppercase font-sans">Evolución de Descargas</span>
+                </div>
+                <!-- Mini Pill Badge mirroring Recharts -->
+                <span class="text-[8px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">Últimos 7 días</span>
+              </div>
+
+              <!-- Quick Metrics Grid -->
+              <div class="grid grid-cols-3 gap-2 mb-4">
+                <div [class]="darkMode() ? 'bg-white/5' : 'bg-neutral-50 border border-black/5'" class="p-2 rounded-xl text-center">
+                  <span class="text-[9px] font-mono uppercase block opacity-40">Total</span>
+                  <span class="text-sm font-black font-mono tracking-tight text-emerald-400">{{ sevenDaysTotalDownloads() }}</span>
+                </div>
+                <div [class]="darkMode() ? 'bg-white/5' : 'bg-neutral-50 border border-black/5'" class="p-2 rounded-xl text-center">
+                  <span class="text-[9px] font-mono uppercase block opacity-40">Promedio</span>
+                  <span class="text-sm font-black font-mono tracking-tight text-sky-400">{{ sevenDaysAverageDownloads() }}</span>
+                </div>
+                <div [class]="darkMode() ? 'bg-white/5' : 'bg-neutral-50 border border-black/5'" class="p-2 rounded-xl text-center">
+                  <span class="text-[9px] font-mono uppercase block opacity-40">Pico</span>
+                  <span class="text-sm font-black font-mono tracking-tight text-indigo-400">{{ sevenDaysPeakCount() }}</span>
+                </div>
+              </div>
+
+              <!-- Recharts Interactive Canvas Container -->
+              <div class="w-full relative h-[185px] select-none rounded-xl overflow-visible">
+                
+                <!-- SVG Area/Line Chart -->
+                <svg viewBox="0 0 450 180" width="100%" height="100%" class="block overflow-visible" preserveAspectRatio="none">
+                  <defs>
+                    <!-- Flowing Emerald Gradient -->
+                    <linearGradient id="rechartsAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stop-color="#10B981" stop-opacity="0.35"/>
+                      <stop offset="95%" stop-color="#10B981" stop-opacity="0.0"/>
+                    </linearGradient>
+                  </defs>
+
+                  <!-- Cartesian Grid Line patterns -->
+                  @for (gLine of chartGridLines(); track $index) {
+                    <!-- Horizontal dashed grids -->
+                    <line 
+                      x1="35" 
+                      [attr.y1]="gLine.y" 
+                      x2="415" 
+                      [attr.y2]="gLine.y" 
+                      [attr.stroke]="darkMode() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'" 
+                      stroke-width="1"
+                      stroke-dasharray="3,3"
+                    />
+                    
+                    <!-- Left Y-Axis labels (ticks values) -->
+                    <text 
+                      x="25" 
+                      [attr.y]="gLine.y + 3" 
+                      text-anchor="end" 
+                      [attr.fill]="darkMode() ? '#9CA3AF' : '#4B5563'" 
+                      class="text-[9px] font-mono select-none"
+                    >
+                      {{ gLine.value | number:'1.0-0' }}
+                    </text>
+                  }
+
+                  <!-- Gradient Filled Area under the curve -->
+                  <path 
+                    [attr.d]="chartPoints().areaPath" 
+                    fill="url(#rechartsAreaGradient)"
+                    class="transition-all duration-300 ease-out"
+                  />
+
+                  <!-- Main Recharts Stroke Line -->
+                  <path 
+                    [attr.d]="chartPoints().linePath" 
+                    stroke="#10B981" 
+                    stroke-width="2.5" 
+                    fill="none" 
+                    class="transition-all duration-300 ease-out"
+                  />
+
+                  <!-- X-Axis line baseline -->
+                  <line 
+                    x1="35" 
+                    [attr.y1]="180 - 25" 
+                    x2="415" 
+                    [attr.y2]="180 - 25" 
+                    [attr.stroke]="darkMode() ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'" 
+                    stroke-width="1"
+                  />
+
+                  <!-- X-Axis date/day text ticks and vertical dot indicators -->
+                  @for (pt of chartPoints().points; track pt.date; let idx = $index) {
+                    <!-- Dot vertical line tracker when active -->
+                    @if (activeChartIndex() === idx) {
+                      <line 
+                        [attr.x1]="pt.x" 
+                        y1="25" 
+                        [attr.x2]="pt.x" 
+                        [attr.y2]="180 - 25" 
+                        [attr.stroke]="darkMode() ? 'rgba(16,185,129,0.25)' : 'rgba(16,185,129,0.15)'" 
+                        stroke-width="1.5"
+                        stroke-dasharray="2,2"
+                      />
+                    }
+
+                    <!-- X-Axis ticks -->
+                    <text 
+                      [attr.x]="pt.x" 
+                      [attr.y]="180 - 10" 
+                      text-anchor="middle" 
+                      [attr.fill]="darkMode() ? '#9CA3AF' : '#4B5563'" 
+                      class="text-[8px] font-mono select-none"
+                    >
+                      {{ pt.dayLabel }}
+                    </text>
+
+                    <!-- Beautiful circle anchor plot -->
+                    <circle 
+                      [attr.cx]="pt.x" 
+                      [attr.cy]="pt.y" 
+                      [attr.r]="activeChartIndex() === idx ? 6 : 4.5" 
+                      [attr.fill]="darkMode() ? '#0f0f12' : '#ffffff'" 
+                      stroke="#10B981" 
+                      [attr.stroke-width]="activeChartIndex() === idx ? 3.5 : 2.5" 
+                      class="transition-all duration-150 shrink-0"
+                    />
+                  }
+
+                  <!-- Overlay interactive hover rects corresponding to vertical zones (Invisible) -->
+                  @for (pt of chartPoints().points; track pt.date; let idx = $index) {
+                    <rect 
+                      [attr.x]="pt.x - 20" 
+                      y="15" 
+                      width="40" 
+                      height="145" 
+                      fill="transparent" 
+                      class="cursor-pointer select-none shrink-0"
+                      (mouseenter)="activeChartIndex.set(idx)"
+                      (mouseleave)="activeChartIndex.set(null)"
+                    />
+                  }
+                </svg>
+
+                <!-- Responsive HTML Floating Recharts-styled Tooltip Overlay -->
+                @if (activeChartIndex() !== null) {
+                  @let hoveredPoint = chartPoints().points[activeChartIndex()!];
+                  <div 
+                    [style.left.%]="(hoveredPoint.x / 450) * 100"
+                    [style.top.%]="(hoveredPoint.y / 180) * 100"
+                    class="absolute -translate-x-1/2 -translate-y-full transform -mt-4 z-40 bg-zinc-900 border border-white/10 p-2.5 rounded-xl text-neutral-200 pointer-events-none shadow-2xl transition-all duration-75 flex flex-col gap-1 min-w-[110px]"
+                  >
+                    <!-- Little arrow pointer under tooltip -->
+                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-zinc-900"></div>
+                    <span class="text-[9px] font-mono opacity-60 leading-none mb-0.5">{{ hoveredPoint.dayLabel }}</span>
+                    <div class="flex items-center gap-1.5 text-[10px] font-bold">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                      <span>Descargas: <strong class="text-white">{{ hoveredPoint.count }}</strong></span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
             <!-- Download Tracker Audit Panel -->
             <div [class]="darkMode() ? 'bg-[#0f0f12] border-white/5 text-white' : 'bg-white border-black/10 text-neutral-800 shadow-sm'" class="p-4 sm:p-5 rounded-2xl border flex flex-col">
               <div class="flex items-center justify-between border-b pb-2.5 mb-3" [class]="darkMode() ? 'border-white/5' : 'border-black/5'">
@@ -1350,10 +1541,16 @@
           <div>
             <!-- Tags and categories -->
             <div class="flex items-center gap-2 mb-2 flex-wrap">
-              <span class="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded-md text-[9px] font-mono uppercase tracking-wider border border-indigo-500/10">
-                {{ wp.aesthetic || 'OLED Art' }}
-              </span>
-              <span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-md text-[9px] font-mono uppercase tracking-wider border border-emerald-500/10">
+              @for (tag of getAestheticTags(wp.aesthetic); track tag) {
+                <button 
+                  (click)="selectedCategory.set(tag); closePreview()"
+                  class="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/25 text-indigo-400 rounded-md text-[9px] font-mono uppercase tracking-wider border border-indigo-500/10 transition-all select-none cursor-pointer"
+                  title="Filtrar galeria por: {{ tag }}"
+                >
+                  #{{ tag }}
+                </button>
+              }
+              <span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-md text-[9px] font-mono uppercase tracking-wider border border-emerald-500/10 font-bold">
                 {{ wp.orientation }}
               </span>
             </div>

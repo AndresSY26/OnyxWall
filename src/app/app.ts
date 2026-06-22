@@ -82,6 +82,27 @@ export class App implements OnInit {
   darkMode = signal<boolean>(true);
   selectedOrientation = signal<'all' | 'vertical' | 'horizontal'>('all');
   selectedCategory = signal<string>('all');
+  detectedAestheticCategories = computed(() => {
+    const list = this.wallpapers();
+    const tagsSet = new Set<string>();
+    
+    list.forEach(wp => {
+      if (wp.aesthetic) {
+        // Split by slashes, commas, semicolons, or pipes
+        const parts = wp.aesthetic.split(/[\/,;|]+/);
+        parts.forEach(p => {
+          const trimmed = p.trim();
+          if (trimmed) {
+            // Capitalize first character and keep the rest intact to preserve terms like OLED
+            const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+            tagsSet.add(capitalized);
+          }
+        });
+      }
+    });
+    
+    return Array.from(tagsSet).sort((a, b) => a.localeCompare(b));
+  });
   searchQuery = signal<string>('');
   showPendingOnly = signal<boolean>(false);
   activeTab = signal<'gallery' | 'admin'>('gallery');
@@ -106,6 +127,126 @@ export class App implements OnInit {
   // Audit Logs (telemetry)
   downloadLogs = signal<DownloadLogData[]>([]);
   showAuditLogs = signal<boolean>(false);
+  activeChartIndex = signal<number | null>(null);
+  
+  dailyDownloadTrend = computed(() => {
+    const logs = this.downloadLogs();
+    const trend = [];
+    const now = new Date();
+    
+    // Day names in Spanish
+    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
+      // Label like "Lun 22" or "Vie 19"
+      const label = `${dayNames[d.getDay()]} ${d.getDate()}`;
+      
+      // Count downloads on this day (ignoring UTC timezone offsets for simplicity of lookup)
+      const count = logs.filter(log => {
+        if (!log.requestedAt) return false;
+        return log.requestedAt.startsWith(dateStr);
+      }).length;
+      
+      trend.push({
+        date: dateStr,
+        label,
+        count
+      });
+    }
+    
+    return trend;
+  });
+
+  chartPoints = computed(() => {
+    const trend = this.dailyDownloadTrend();
+    if (trend.length === 0) return { linePath: '', areaPath: '', points: [], maxCount: 5, height: 160, width: 400, paddingX: 30, paddingY: 20, chartWidth: 340, chartHeight: 120 };
+    
+    const width = 450;
+    const height = 180;
+    const paddingX = 35;
+    const paddingY = 25;
+    
+    const chartWidth = width - paddingX * 2;
+    const chartHeight = height - paddingY * 2;
+    
+    const counts = trend.map(t => t.count);
+    const maxVal = Math.max(...counts);
+    const maxCount = maxVal === 0 ? 5 : maxVal; // Guarantee a scale of at least 5
+    
+    const points = trend.map((t, i) => {
+      const x = paddingX + (i * (chartWidth / (trend.length - 1 || 1)));
+      const y = height - paddingY - ((t.count / maxCount) * chartHeight);
+      return {
+        x,
+        y,
+        dayLabel: t.label,
+        count: t.count,
+        date: t.date
+      };
+    });
+    
+    let linePath = '';
+    let areaPath = '';
+    
+    if (points.length > 0) {
+      // Create straight lines
+      linePath = `M ${points[0].x} ${points[0].y}`;
+      for (let i = 1; i < points.length; i++) {
+        linePath += ` L ${points[i].x} ${points[i].y}`;
+      }
+      
+      // Area path starts with line, then goes to baseline corners, then closes
+      areaPath = `${linePath} L ${points[points.length - 1].x} ${height - paddingY} L ${points[0].x} ${height - paddingY} Z`;
+    }
+    
+    return {
+      linePath,
+      areaPath,
+      points,
+      maxCount,
+      height,
+      width,
+      paddingX,
+      paddingY,
+      chartWidth,
+      chartHeight
+    };
+  });
+
+  chartGridLines = computed(() => {
+    const cp = this.chartPoints();
+    const lines = [];
+    const divisions = 4;
+    for (let i = 0; i <= divisions; i++) {
+      const ratio = i / divisions;
+      const y = cp.paddingY + ratio * cp.chartHeight;
+      const value = Math.round((1 - ratio) * cp.maxCount * 10) / 10;
+      lines.push({ y, value });
+    }
+    return lines;
+  });
+
+  sevenDaysTotalDownloads = computed(() => {
+    return this.dailyDownloadTrend().reduce((sum, item) => sum + item.count, 0);
+  });
+
+  sevenDaysAverageDownloads = computed(() => {
+    const total = this.sevenDaysTotalDownloads();
+    return Math.round((total / 7) * 10) / 10;
+  });
+
+  sevenDaysPeakCount = computed(() => {
+    const counts = this.dailyDownloadTrend().map(t => t.count);
+    return counts.length > 0 ? Math.max(...counts) : 0;
+  });
   
   // Forms & upload signals
   uploadForm: FormGroup;
@@ -252,6 +393,14 @@ export class App implements OnInit {
     } finally {
       this.userProfilesLoading.set(false);
     }
+  }
+
+  getAestheticTags(aesthetic?: string): string[] {
+    if (!aesthetic) return [];
+    return aesthetic.split(/[\/,;|]+/).map(s => {
+      const trimmed = s.trim();
+      return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+    }).filter(Boolean);
   }
 
   getUploaderName(wp: WallpaperData): string {
@@ -876,7 +1025,60 @@ export class App implements OnInit {
       for (const wp of defaultWps) {
         await uploadNewWallpaper(wp);
       }
+      
+      // Seed beautiful download logs for the last 7 days if they don't exist yet
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const existingLogs = localStorage.getItem('aerowall_mock_download_logs');
+        if (!existingLogs || JSON.parse(existingLogs).length === 0) {
+          const mockDownloadLogs: DownloadLogData[] = [];
+          const titles = [
+            'Geometría Abstracta Metálica',
+            'Nebulosa en Vacío Absoluto',
+            'Líneas de Cobre Celestiales',
+            'Arquitectura Minimalista Futura',
+            'Árbol Solitario Solsticio',
+            'Estructuras de Grafito'
+          ];
+          const users = [
+            { name: 'Andrés Sy', email: 'andressy1126@gmail.com' },
+            { name: 'Sofía Castro', email: 'sofia.castro@gmail.com' },
+            { name: 'Mateo González', email: 'mateo.gonz@outlook.com' },
+            { name: 'Lucía Fernández', email: 'lucia.fer@gmail.com' },
+            { name: 'Carlos Ruiz', email: 'carlosruiz24@hotmail.com' }
+          ];
+
+          const now = new Date();
+          // Seed the last 7 days with some realistic variation (sine/random)
+          for (let i = 0; i < 7; i++) {
+            const targetDate = new Date();
+            targetDate.setDate(now.getDate() - i);
+            const dateStr = targetDate.toISOString().split('T')[0];
+            
+            // Random daily downloads (between 2 to 7)
+            const count = 3 + Math.floor(Math.sin(i * 1.5) * 2.5 + Math.random() * 2.5);
+            for (let j = 0; j < count; j++) {
+              const u = users[Math.floor(Math.random() * users.length)];
+              const t = titles[Math.floor(Math.random() * titles.length)];
+              const requestedAt = new Date(targetDate.getTime());
+              requestedAt.setHours(9 + Math.floor(Math.random() * 11), Math.floor(Math.random() * 60));
+              
+              mockDownloadLogs.push({
+                id: `req_seed_${i}_${j}_${Math.floor(Math.random() * 1000)}`,
+                wallpaperId: `wp_seed_${Math.floor(Math.random() * 6)}`,
+                wallpaperTitle: t,
+                requestedBy: `usr_${Math.floor(Math.random() * 1000)}`,
+                requestedByEmail: u.email,
+                requestedByName: u.name,
+                requestedAt: requestedAt.toISOString()
+              });
+            }
+          }
+          localStorage.setItem('aerowall_mock_download_logs', JSON.stringify(mockDownloadLogs));
+        }
+      }
+
       await this.loadWallpapers();
+      await this.loadAuditLogs();
     } catch (e) {
       console.error('Error seeding initial data', e);
     } finally {

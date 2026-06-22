@@ -49,3 +49,15 @@ Thumbs.db
 # Firebase local config secrets
 /firebase-applet-config.json
 
+# Local keys, credentials and certificated files
+*.pem
+*.key
+*.p12
+*.pfx
+*.ppk
+*.crt
+*credentials*.json
+*secret*.json
+*.log
+.env*.local
+
